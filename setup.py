@@ -98,6 +98,7 @@ setup(
     entry_points={
         "console_scripts": [
             "piper = piper.__main__:main",
+            "piper-phonemize = piper.phonemize:main",
         ]
     },
 )

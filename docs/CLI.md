@@ -74,6 +74,32 @@ espeak-ng -v en-us --ipa=3 -q batman
 bˈætmæn
 ```
 
+## Phonemization
+
+Use `piper-phonemize` to convert text to phonemes. It reads one request per line
+from standard input and writes one JSON response per line to standard output.
+Each request must be a JSON object with `phonemeType` and `text` fields.
+Supported `phonemeType` values are `espeak`, `text`, and `pinyin`.
+
+``` sh
+echo '{ "phonemeType": "espeak", "voice": "en-us", "text": "This is a test." }' | piper-phonemize
+```
+
+For `espeak`, `voice` is required and is passed directly to eSpeak. For `text`,
+the input text is decomposed into codepoints. For `pinyin`, the Chinese
+phonemizer is used.
+
+Responses contain the original `text`, `phonemeType`, and sentence-grouped
+phonemes in a `phonemes` field.
+
+If one request fails, `piper-phonemize` writes a JSON error response with
+`error` and `message` fields for that line and continues processing subsequent
+requests.
+
+**Important:** `piper-phonemize` currently does not handle `[[ raw phonemes ]]` blocks, and it
+does not apply Piper's Arabic diacritization step. Input text is sent directly
+to the selected phonemizer.
+
 ## Binary Releases
 
 * [amd64](https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz) (64-bit desktop Linux)

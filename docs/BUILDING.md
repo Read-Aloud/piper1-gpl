@@ -8,6 +8,20 @@ You will need the following system packages installed (`apt-get`):
 * `cmake`
 * `ninja-build`
 
+On Amazon Linux 2023:
+
+``` sh
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y cmake ninja-build git python3 python3-devel
+```
+
+On Ubuntu/Debian:
+
+``` sh
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build
+```
+
 To create a dev environment:
 
 ``` sh
@@ -28,6 +42,12 @@ Now you should be able to use `script/run` or manually run Piper:
 
 ``` sh
 python3 -m piper --help
+```
+
+You can also run the eSpeak phonemization CLI:
+
+``` sh
+echo '{"voice":"en-us","text":"This is a test."}' | piper-phonemize
 ```
 
 You can manually build wheels with:
