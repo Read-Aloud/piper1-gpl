@@ -24,11 +24,21 @@ class FakeChinesePhonemizer:
         return [[text, "pinyin"]]
 
 
+class FakeTashkeelDiacritizer:
+    """Test double for Arabic diacritization."""
+
+    def diacritize(self, text: str, taskeen_threshold=None) -> str:
+        """Return diacritized-like data."""
+
+        return f"{text}|tashkeel={taskeen_threshold}"
+
+
 class FakePhonemizers:
     """Test double for lazy phonemizer holder."""
 
     espeak = FakeEspeakPhonemizer()
     chinese = FakeChinesePhonemizer()
+    tashkeel = FakeTashkeelDiacritizer()
 
 
 def test_get_request() -> None:
@@ -46,6 +56,18 @@ def test_get_request() -> None:
         "phonemeType": "text",
         "text": "abc",
     }
+    assert get_request(
+        (
+            '{"phonemeType": "espeak", "voice": "ar", "text": "مرحبا", '
+            '"useTashkeel": false, "taskeenThreshold": 0.5}\n'
+        )
+    ) == {
+        "phonemeType": "espeak",
+        "voice": "ar",
+        "text": "مرحبا",
+        "useTashkeel": False,
+        "taskeenThreshold": 0.5,
+    }
 
 
 def test_phonemize_request_espeak() -> None:
@@ -60,6 +82,61 @@ def test_phonemize_request_espeak() -> None:
         "text": "Test 1.",
         "phonemeType": "espeak",
         "phonemes": [["en-us", "Test 1."]],
+    }
+
+
+def test_phonemize_request_espeak_arabic_diacritizes() -> None:
+    """Test that Arabic eSpeak requests are diacritized by default."""
+
+    result = phonemize_request(
+        FakePhonemizers(),  # type: ignore[arg-type]
+        {"phonemeType": "espeak", "voice": "ar", "text": "مرحبا"},
+    )
+
+    assert result == {
+        "text": "مرحبا",
+        "phonemeType": "espeak",
+        "phonemes": [["ar", "مرحبا|tashkeel=0.8"]],
+    }
+
+
+def test_phonemize_request_espeak_arabic_can_disable_diacritization() -> None:
+    """Test that Arabic diacritization can be disabled per request."""
+
+    result = phonemize_request(
+        FakePhonemizers(),  # type: ignore[arg-type]
+        {
+            "phonemeType": "espeak",
+            "voice": "ar",
+            "text": "مرحبا",
+            "useTashkeel": False,
+        },
+    )
+
+    assert result == {
+        "text": "مرحبا",
+        "phonemeType": "espeak",
+        "phonemes": [["ar", "مرحبا"]],
+    }
+
+
+def test_phonemize_request_espeak_arabic_taskeen_threshold() -> None:
+    """Test that Arabic diacritization accepts a taskeen threshold."""
+
+    result = phonemize_request(
+        FakePhonemizers(),  # type: ignore[arg-type]
+        {
+            "phonemeType": "espeak",
+            "voice": "ar",
+            "text": "مرحبا",
+            "taskeenThreshold": 0.5,
+        },
+    )
+
+    assert result == {
+        "text": "مرحبا",
+        "phonemeType": "espeak",
+        "phonemes": [["ar", "مرحبا|tashkeel=0.5"]],
     }
 
 

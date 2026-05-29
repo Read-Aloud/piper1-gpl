@@ -26,6 +26,7 @@ class Phonemizers:
         self.download_dir = download_dir or Path.cwd()
         self._espeak: Optional[EspeakPhonemizer] = None
         self._chinese: Optional[Any] = None
+        self._tashkeel: Optional[Any] = None
 
     @property
     def espeak(self) -> EspeakPhonemizer:
@@ -47,8 +48,19 @@ class Phonemizers:
 
         return self._chinese
 
+    @property
+    def tashkeel(self) -> Any:
+        """Get the Arabic diacritizer."""
 
-def get_request(line: str) -> Optional[dict[str, str]]:
+        if self._tashkeel is None:
+            from .tashkeel import TashkeelDiacritizer
+
+            self._tashkeel = TashkeelDiacritizer()
+
+        return self._tashkeel
+
+
+def get_request(line: str) -> Optional[dict[str, Any]]:
     """Parse one JSONL phonemization request."""
 
     line = line.strip()
@@ -70,25 +82,50 @@ def get_request(line: str) -> Optional[dict[str, str]]:
     if phoneme_type not in _PHONEME_TYPES:
         raise ValueError(f"Unexpected phonemeType: {phoneme_type}")
 
-    parsed_request = {"text": text, "phonemeType": phoneme_type}
+    parsed_request: dict[str, Any] = {"text": text, "phonemeType": phoneme_type}
     if phoneme_type == "espeak":
         voice = request.get("voice")
         if not isinstance(voice, str):
             raise ValueError("eSpeak phonemize request is missing string field: voice")
 
         parsed_request["voice"] = voice
+        use_tashkeel = request.get("useTashkeel")
+        if use_tashkeel is not None:
+            if not isinstance(use_tashkeel, bool):
+                raise ValueError(
+                    "eSpeak phonemize request field useTashkeel must be boolean"
+                )
+
+            parsed_request["useTashkeel"] = use_tashkeel
+
+        taskeen_threshold = request.get("taskeenThreshold")
+        if taskeen_threshold is not None:
+            if isinstance(taskeen_threshold, bool) or not isinstance(
+                taskeen_threshold, (int, float)
+            ):
+                raise ValueError(
+                    "eSpeak phonemize request field taskeenThreshold must be a number"
+                )
+
+            parsed_request["taskeenThreshold"] = float(taskeen_threshold)
 
     return parsed_request
 
 
 def phonemize_request(
-    phonemizers: Phonemizers, request: dict[str, str]
+    phonemizers: Phonemizers, request: dict[str, Any]
 ) -> dict[str, Any]:
     """Phonemize one request."""
 
     phoneme_type = request["phonemeType"]
-    text = request["text"]
+    original_text = request["text"]
+    text = original_text
     if phoneme_type == "espeak":
+        if (request["voice"] == "ar") and request.get("useTashkeel", True):
+            text = phonemizers.tashkeel.diacritize(
+                text, taskeen_threshold=request.get("taskeenThreshold", 0.8)
+            )
+
         phonemes = phonemizers.espeak.phonemize(request["voice"], text)
     elif phoneme_type == "text":
         phonemes = [list(unicodedata.normalize("NFD", text))]
@@ -98,7 +135,7 @@ def phonemize_request(
         raise ValueError(f"Unexpected phonemeType: {phoneme_type}")
 
     return {
-        "text": text,
+        "text": original_text,
         "phonemeType": phoneme_type,
         "phonemes": phonemes,
     }

@@ -85,8 +85,11 @@ Supported `phonemeType` values are `espeak`, `text`, and `pinyin`.
 echo '{ "phonemeType": "espeak", "voice": "en-us", "text": "This is a test." }' | piper-phonemize
 ```
 
-For `espeak`, `voice` is required and is passed directly to eSpeak. For `text`,
-the input text is decomposed into codepoints. For `pinyin`, the Chinese
+For `espeak`, `voice` is required and is passed to eSpeak. Arabic eSpeak
+requests (`voice: "ar"`) are diacritized by default before phonemization. Set
+`useTashkeel` to `false` to disable this per request, or set
+`taskeenThreshold` to a number to override the default `0.8` threshold. For
+`text`, the input text is decomposed into codepoints. For `pinyin`, the Chinese
 phonemizer is used.
 
 Responses contain the original `text`, `phonemeType`, and sentence-grouped
@@ -96,9 +99,8 @@ If one request fails, `piper-phonemize` writes a JSON error response with
 `error` and `message` fields for that line and continues processing subsequent
 requests.
 
-**Important:** `piper-phonemize` currently does not handle `[[ raw phonemes ]]` blocks, and it
-does not apply Piper's Arabic diacritization step. Input text is sent directly
-to the selected phonemizer.
+**Important:** `piper-phonemize` currently does not handle `[[ raw phonemes ]]`
+blocks.
 
 ## Binary Releases
 
