@@ -32,6 +32,12 @@ source .venv/bin/activate
 python3 -m pip install -e .[dev]
 ```
 
+For pinyin support, include the `zh` extra:
+
+``` sh
+python3 -m pip install -e .[zh,dev]
+```
+
 Next, run `script/dev_build` or manually build the extension:
 
 ``` sh
