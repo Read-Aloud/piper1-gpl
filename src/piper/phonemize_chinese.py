@@ -7,14 +7,12 @@ This code is Apache 2.0 licensed.
 
 import logging
 import re
+import shutil
 import tarfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Optional, Union
 from urllib.request import urlopen
-
-from g2pw import G2PWConverter
-from unicode_rbnf import RbnfEngine
 
 from .const import BOS, EOS, PAD
 from .phoneme_ids import DEFAULT_PHONEME_ID_MAP
@@ -188,6 +186,14 @@ GROUP_END_PHONEMES = {
 }
 
 G2PW_URL = "https://huggingface.co/datasets/rhasspy/piper-checkpoints/resolve/main/zh/zh_CN/_resources/g2pw.tar.gz?download=true"
+BERT_BASE_CHINESE_URL_FORMAT = (
+    "https://huggingface.co/bert-base-chinese/resolve/main/{file_name}?download=true"
+)
+BERT_BASE_CHINESE_TOKENIZER_DIR = "bert-base-chinese"
+BERT_BASE_CHINESE_TOKENIZER_FILES = (
+    "vocab.txt",
+    "tokenizer_config.json",
+)
 
 TEMP_PATTERN = re.compile(
     r"(?P<sign>[-−])?(?P<num>\d+)\s*(?:°\s*C|℃)",  # handles "-7°C", "7℃", "−3°C"
@@ -205,12 +211,18 @@ class ChinesePhonemizer:
 
     def __init__(self, model_dir: Union[str, Path]) -> None:
         """Initialize phonemizer."""
+        from g2pw import G2PWConverter
+        from unicode_rbnf import RbnfEngine
 
         # Ensure model is downloaded
         download_model(model_dir)
+        model_dir = Path(model_dir)
 
         self.g2p = G2PWConverter(
-            model_dir=str(model_dir), style="pinyin", enable_non_tradional_chinese=True
+            model_dir=str(model_dir),
+            model_source=str(model_dir / BERT_BASE_CHINESE_TOKENIZER_DIR),
+            style="pinyin",
+            enable_non_tradional_chinese=True,
         )
         self.number_engine = RbnfEngine.for_language("zh")
 
@@ -374,6 +386,9 @@ def download_model(model_dir: Union[str, Path]) -> None:
     if model_path.exists():
         # Already downloaded
         _LOGGER.debug("Found g2pW model at %s", model_path)
+        download_bert_base_chinese_tokenizer(
+            model_dir / BERT_BASE_CHINESE_TOKENIZER_DIR
+        )
         return
 
     _LOGGER.info("Downloading g2pW model from '%s' to '%s'", G2PW_URL, model_dir)
@@ -381,3 +396,29 @@ def download_model(model_dir: Union[str, Path]) -> None:
     with urlopen(G2PW_URL) as response:
         with tarfile.open(fileobj=response, mode="r|gz") as tar:
             tar.extractall(path=model_dir)
+
+    download_bert_base_chinese_tokenizer(model_dir / BERT_BASE_CHINESE_TOKENIZER_DIR)
+
+
+def download_bert_base_chinese_tokenizer(tokenizer_dir: Union[str, Path]) -> None:
+    """Ensure the BERT tokenizer used by g2pW is available locally."""
+    tokenizer_dir = Path(tokenizer_dir)
+    missing_files = [
+        file_name
+        for file_name in BERT_BASE_CHINESE_TOKENIZER_FILES
+        if not (tokenizer_dir / file_name).exists()
+    ]
+
+    if not missing_files:
+        _LOGGER.debug("Found bert-base-chinese tokenizer at %s", tokenizer_dir)
+        return
+
+    _LOGGER.info("Downloading bert-base-chinese tokenizer to '%s'", tokenizer_dir)
+    tokenizer_dir.mkdir(parents=True, exist_ok=True)
+    for file_name in missing_files:
+        url = BERT_BASE_CHINESE_URL_FORMAT.format(file_name=file_name)
+        file_path = tokenizer_dir / file_name
+        _LOGGER.debug("Downloading '%s' to '%s'", url, file_path)
+        with urlopen(url) as response:
+            with open(file_path, "wb") as tokenizer_file:
+                shutil.copyfileobj(response, tokenizer_file)
